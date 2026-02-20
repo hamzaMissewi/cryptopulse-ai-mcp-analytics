@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
-import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+// import { DefaultChatTransport } from 'ai';
+import { useRef, useEffect, useState, SubmitEvent } from 'react';
+import { useChat } from '@ai-sdk/react'
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -40,10 +40,19 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    transport: new DefaultChatTransport({
-      api: '/api/chat',
-    }),
+  // const { messages, input, handleInputChange, handleSubmit, status } = useChat();
+  const { messages, input, setInput, handleInputChange, handleSubmit: handleChatSubmit, setMessages, append, status } = useChat({
+    api: '/api/chat',
+    // initialMessages: [
+    //   {
+    //     role: 'system',
+    //     content:
+    //       'You are CryptoPulse AI, a professional crypto market analyst. Provide clear, concise, data-driven insights about crypto markets.',
+    //   },
+    // ],
+    // onError(err: string) {
+    //   console.error('Chat error:', err);
+    // },
   });
 
   useEffect(() => {
@@ -56,9 +65,12 @@ export default function Dashboard() {
     }
   }, [messages]);
 
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    handleSubmit(e as any);
+    if (input.trim()) {
+      append({ role: 'user', content: input });
+      setInput('');
+    }
   };
 
   if (!isHydrated) {
@@ -137,8 +149,8 @@ export default function Dashboard() {
                   >
                     <div
                       className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-3 rounded-lg ${message.role === 'user'
-                          ? 'bg-accent text-accent-foreground'
-                          : 'bg-secondary text-foreground'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'bg-secondary text-foreground'
                         }`}
                     >
                       <p className="text-sm md:text-base whitespace-pre-wrap">{messageText}</p>
@@ -146,7 +158,7 @@ export default function Dashboard() {
                   </div>
                 );
               })}
-              {isLoading && (
+              {status === "streaming" && (
                 <div className="flex justify-start">
                   <div className="bg-secondary text-foreground px-4 py-3 rounded-lg">
                     <div className="flex gap-2">
@@ -169,11 +181,11 @@ export default function Dashboard() {
                 onChange={handleInputChange}
                 placeholder="Ask about Bitcoin, Ethereum, market trends, price predictions..."
                 className="flex-1 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
-                disabled={isLoading}
+                disabled={status === "streaming"}
               />
               <Button
                 type="submit"
-                disabled={isLoading || !input?.trim()}
+                disabled={status === "streaming" || !input?.trim()}
                 className="bg-accent hover:bg-accent/90 text-accent-foreground px-4"
               >
                 <Send className="w-4 h-4" />

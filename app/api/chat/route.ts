@@ -1,5 +1,5 @@
-import { streamText, tool, ToolLoopAgent, createAgentUIStreamResponse } from 'ai';
 import { google } from '@ai-sdk/google';
+import { createAgentUIStreamResponse, tool, ToolLoopAgent } from 'ai';
 import { z } from 'zod';
 
 // Define tools for the MCP server
