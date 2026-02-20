@@ -1,12 +1,12 @@
 import { google } from '@ai-sdk/google';
-import { createAgentUIStreamResponse, tool, ToolLoopAgent } from 'ai';
+import { createDataStreamResponse, streamText, tool } from 'ai';
 import { z } from 'zod';
 
 // Define tools for the MCP server
 const tools = {
   getCurrentPrice: tool({
     description: 'Get the current price of a cryptocurrency',
-    inputSchema: z.object({
+    parameters: z.object({
       symbol: z.string().describe('The cryptocurrency symbol (e.g., BTC, ETH)'),
     }),
     execute: async ({ symbol }) => {
@@ -29,7 +29,7 @@ const tools = {
 
   getMarketData: tool({
     description: 'Get detailed market data for multiple cryptocurrencies',
-    inputSchema: z.object({
+    parameters: z.object({
       symbols: z.array(z.string()).describe('Array of cryptocurrency symbols'),
       timeframe: z.enum(['24h', '7d', '30d']).optional().describe('The timeframe for analysis'),
     }),
@@ -53,7 +53,7 @@ const tools = {
 
   analyzeTrend: tool({
     description: 'Analyze the trend and provide technical analysis for a cryptocurrency',
-    inputSchema: z.object({
+    parameters: z.object({
       symbol: z.string().describe('The cryptocurrency symbol'),
       timeframe: z.enum(['1h', '4h', '1d', '1w']).optional().describe('Timeframe for analysis'),
     }),
@@ -75,7 +75,7 @@ const tools = {
 
   getNews: tool({
     description: 'Get latest news about cryptocurrencies',
-    inputSchema: z.object({
+    parameters: z.object({
       symbol: z.string().optional().describe('Specific cryptocurrency symbol'),
       limit: z.number().optional().describe('Number of news items to return'),
     }),
@@ -109,7 +109,7 @@ const tools = {
 
   predictPrice: tool({
     description: 'Predict the future price of a cryptocurrency based on AI analysis',
-    inputSchema: z.object({
+    parameters: z.object({
       symbol: z.string().describe('The cryptocurrency symbol'),
       hoursAhead: z.number().optional().describe('Number of hours to predict ahead'),
     }),
@@ -154,22 +154,35 @@ When users ask about specific cryptocurrencies or market conditions, use the ava
 
 Always be helpful, accurate, and honest about market risks. Never provide financial advice, only analysis and information.`;
 
-const agent = new ToolLoopAgent({
-  model: google('gemini-2.0-flash'),
-  instructions: systemPrompt,
-  tools,
-  maxSteps: 10,
-});
-
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    return createAgentUIStreamResponse({
-      agent,
-      uiMessages: messages,
+    return createDataStreamResponse({
+      execute: async (dataStream) => {
+        const result = await streamText({
+          model: google('gemini-2.0-flash'),
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
+            ...messages,
+          ],
+          tools,
+          maxSteps: 10,
+        });
+
+        result.textStream.pipeTo(
+          new WritableStream({
+            write(chunk) {
+              dataStream.writeData(chunk);
+            },
+          })
+        );
+      },
     });
   } catch (error) {
     console.error('Chat API error:', error);
